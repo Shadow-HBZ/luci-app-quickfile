@@ -1,0 +1,64 @@
+name: Build Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: "Target architecture"
+        required: true
+        default: "x86_64"
+        type: choice
+        options:
+          - x86_64
+          - aarch64_generic
+          - aarch64_cortex-a53
+          - aarch64_cortex-a72
+          - aarch64_cortex-a76
+          - arm_cortex-a7_neon-vfpv4
+          - mips_24kc
+          - mipsel_24kc
+          - riscv64_riscv64
+          - loongarch64_generic
+      tag:
+        description: "OpenWrt version"
+        required: true
+        default: "openwrt-24.10"
+        type: choice
+        options:
+          - openwrt-24.10
+          - openwrt-25.12
+
+jobs:
+  build:
+    name: Build ${{ inputs.arch }}-${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    env:
+      ARCH: ${{ inputs.arch }}-${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build preparation
+        run: |
+          echo "EFFECTIVE_ARCH=${{ inputs.arch }}" >> $GITHUB_ENV
+          if [ "${{ inputs.tag }}" = "openwrt-25.12" ] && [ "${{ inputs.arch }}" = "riscv64_riscv64" ]; then
+            echo "EFFECTIVE_ARCH=riscv64_generic" >> $GITHUB_ENV
+            echo "ARCH=riscv64_generic-${{ inputs.tag }}" >> $GITHUB_ENV
+          fi
+
+      - name: Build Packages
+        uses: sbwml/openwrt-gh-action-sdk@main
+        env:
+          FEEDNAME: packages_ci
+          PACKAGES: quickfile luci-app-quickfile
+          NO_REFRESH_CHECK: true
+
+      - name: List output
+        run: |
+          find bin/packages -type f | sort
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARCH }}
+          path: bin/packages/${{ env.EFFECTIVE_ARCH }}/packages_ci/
+          if-no-files-found: error
