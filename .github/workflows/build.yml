@@ -27,6 +27,14 @@ on:
         options:
           - openwrt-24.10
           - openwrt-25.12
+      release:
+        description: "Publish packages to GitHub Release"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -62,3 +70,20 @@ jobs:
           name: ${{ env.ARCH }}
           path: bin/packages/${{ env.EFFECTIVE_ARCH }}/packages_ci/
           if-no-files-found: error
+
+      - name: Publish release
+        if: ${{ inputs.release }}
+        uses: ncipollo/release-action@v1
+        with:
+          name: ${{ env.ARCH }}
+          tag: ${{ env.ARCH }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
+          replacesArtifacts: true
+          makeLatest: false
+          artifacts: "bin/packages/${{ env.EFFECTIVE_ARCH }}/packages_ci/*.apk,bin/packages/${{ env.EFFECTIVE_ARCH }}/packages_ci/*.ipk"
+          body: |
+            quickfile + luci-app-quickfile packages for **${{ env.ARCH }}**
+
+            Built automatically by GitHub Actions from [`${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}).
+            Install: `apk add --allow-untrusted quickfile-*.apk luci-app-quickfile-*.apk`
